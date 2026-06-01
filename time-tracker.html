@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>타임 트래커 대시보드</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue-50: #EFF6FF;
+    --blue-100: #DBEAFE;
+    --blue-400: #60A5FA;
+    --blue-500: #3B82F6;
+    --blue-600: #2563EB;
+    --blue-700: #1D4ED8;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-300: #D1D5DB;
+    --gray-500: #6B7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #F0F4F8;
+    color: var(--gray-900);
+    min-height: 100vh;
+  }
+  .timer-display {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: var(--blue-600);
+    text-shadow: 0 0 30px rgba(37,99,235,0.15);
+  }
+  .btn-start {
+    background: linear-gradient(135deg, #3B82F6, #2563EB);
+    color: white;
+    border: none;
+    padding: 0.75rem 2.5rem;
+    border-radius: 9999px;
+    font-size: 1rem;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+  }
+  .btn-start:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.4); }
+  .btn-start:active { transform: translateY(0); }
+  .btn-stop {
+    background: linear-gradient(135deg, #EF4444, #DC2626);
+    color: white;
+    border: none;
+    padding: 0.75rem 2.5rem;
+    border-radius: 9999px;
+    font-size: 1rem;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 14px rgba(220,38,38,0.35);
+  }
+  .btn-stop:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(220,38,38,0.4); }
+  .card {
+    background: white;
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    background: var(--gray-200);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+  .cal-header {
+    background: var(--blue-600);
+    color: white;
+    text-align: center;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .cal-cell {
+    background: white;
+    min-height: 80px;
+    padding: 6px;
+    font-size: 0.7rem;
+    vertical-align: top;
+    position: relative;
+  }
+  .cal-cell.empty { background: var(--gray-50); }
+  .cal-cell.today { background: var(--blue-50); }
+  .cal-date {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    margin-bottom: 4px;
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+  }
+  .cal-cell.today .cal-date {
+    background: var(--blue-600);
+    color: white;
+  }
+  .cal-entry {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--blue-700);
+    background: var(--blue-50);
+    border-left: 2px solid var(--blue-400);
+    padding: 1px 4px;
+    margin: 2px 0;
+    border-radius: 0 3px 3px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-btn {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--gray-700);
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { background: var(--blue-50); border-color: var(--blue-400); color: var(--blue-600); }
+  select, input[type="text"] {
+    border: 1.5px solid var(--gray-200);
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.875rem;
+    font-size: 0.9rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--gray-900);
+    background: white;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  select:focus, input[type="text"]:focus { border-color: var(--blue-500); }
+  .add-btn {
+    background: var(--blue-600);
+    color: white;
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .add-btn:hover { background: var(--blue-700); }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--blue-50);
+    border: 1px solid var(--blue-100);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+    color: var(--blue-700);
+  }
+  .tag-remove {
+    cursor: pointer;
+    color: var(--gray-500);
+    font-size: 1rem;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .tag-remove:hover { color: #EF4444; }
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #22C55E;
+    animation: pulse 1.5s infinite;
+    display: inline-block;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+  @media (max-width: 640px) {
+    .cal-cell { min-height: 55px; padding: 4px; }
+    .cal-entry { font-size: 0.58rem; }
+    .cal-date { font-size: 0.7rem; width: 20px; height: 20px; line-height: 20px; }
+    .timer-display { font-size: 2.8rem; }
+  }
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem;
+    background: var(--gray-900); color: white;
+    padding: 0.75rem 1.25rem; border-radius: 0.75rem;
+    font-size: 0.875rem; z-index: 1000;
+    animation: slideUp 0.3s ease, fadeOut 0.3s ease 2.2s forwards;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  }
+  @keyframes slideUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+  @keyframes fadeOut { to { opacity:0; } }
+</style>
+</head>
+<body>
+
+<div class="max-w-5xl mx-auto px-4 py-6">
+
+  <!-- 헤더 -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">⏱ 타임 트래커</h1>
+    <p class="text-sm text-gray-500 mt-1">나의 시간을 기록하고 분석해보세요</p>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+    <!-- 왼쪽: 스탑워치 + 카테고리 -->
+    <div class="lg:col-span-1 flex flex-col gap-4">
+
+      <!-- 스탑워치 카드 -->
+      <div class="card text-center">
+        <div class="flex items-center justify-center gap-2 mb-3">
+          <span id="statusDot" style="display:none" class="pulse-dot"></span>
+          <span id="statusText" class="text-xs text-gray-400 uppercase tracking-widest">대기 중</span>
+        </div>
+        <div class="timer-display mb-4" id="timerDisplay">00:00:00</div>
+        <div class="mb-4">
+          <select id="categorySelect" class="mb-2">
+            <option value="">카테고리 선택</option>
+          </select>
+        </div>
+        <button id="mainBtn" class="btn-start" onclick="toggleTimer()">▶ 시작</button>
+      </div>
+
+      <!-- 카테고리 관리 카드 -->
+      <div class="card">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">카테고리 관리</h2>
+        <div class="flex gap-2 mb-3">
+          <input type="text" id="newCategoryInput" placeholder="새 카테고리 이름" onkeydown="if(event.key==='Enter')addCategory()">
+          <button class="add-btn" onclick="addCategory()">추가</button>
+        </div>
+        <div id="categoryTags" class="flex flex-wrap gap-2"></div>
+      </div>
+
+    </div>
+
+    <!-- 오른쪽: 달력 -->
+    <div class="lg:col-span-2">
+      <div class="card">
+        <!-- 달력 헤더 -->
+        <div class="flex items-center justify-between mb-4">
+          <button class="nav-btn" onclick="changeMonth(-1)">← 이전 달</button>
+          <h2 class="text-lg font-bold text-gray-800" id="calendarTitle"></h2>
+          <button class="nav-btn" onclick="changeMonth(1)">다음 달 →</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 통계 그래프 -->
+  <div class="card mt-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide" id="chartTitle">이번 달 카테고리별 투자 시간</h2>
+    <div style="position:relative; height:220px;">
+      <canvas id="statsChart"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DEFAULT_CATEGORIES = ['인도네시아어 회화 공부', '콘텐츠 기획', '운동'];
+const STORAGE_KEYS = { categories: 'tt_categories', records: 'tt_records' };
+
+let timerInterval = null;
+let timerSeconds = 0;
+let isRunning = false;
+let currentChart = null;
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+
+function loadData(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
+}
+function saveData(key, data) {
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) { console.warn('localStorage unavailable:', e); }
+}
+
+function getCategories() {
+  return loadData(STORAGE_KEYS.categories) || [...DEFAULT_CATEGORIES];
+}
+function saveCategories(cats) { saveData(STORAGE_KEYS.categories, cats); }
+
+function getRecords() { return loadData(STORAGE_KEYS.records) || {}; }
+function saveRecords(records) { saveData(STORAGE_KEYS.records, records); }
+
+function initCategories() {
+  if (!loadData(STORAGE_KEYS.categories)) {
+    saveCategories([...DEFAULT_CATEGORIES]);
+  }
+  renderCategoryTags();
+  renderCategorySelect();
+}
+
+function renderCategoryTags() {
+  const cats = getCategories();
+  const container = document.getElementById('categoryTags');
+  container.innerHTML = cats.map((c, i) => `
+    <span class="tag">
+      ${c}
+      <span class="tag-remove" onclick="removeCategory(${i})" title="삭제">×</span>
+    </span>
+  `).join('');
+}
+
+function renderCategorySelect() {
+  const cats = getCategories();
+  const sel = document.getElementById('categorySelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">카테고리 선택</option>' +
+    cats.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('');
+}
+
+function addCategory() {
+  const input = document.getElementById('newCategoryInput');
+  const name = input.value.trim();
+  if (!name) return;
+  const cats = getCategories();
+  if (cats.includes(name)) { showToast('이미 존재하는 카테고리예요.'); return; }
+  cats.push(name);
+  saveCategories(cats);
+  input.value = '';
+  renderCategoryTags();
+  renderCategorySelect();
+}
+
+function removeCategory(i) {
+  const cats = getCategories();
+  cats.splice(i, 1);
+  saveCategories(cats);
+  renderCategoryTags();
+  renderCategorySelect();
+}
+
+function formatTime(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return [h,m,sec].map(n=>String(n).padStart(2,'0')).join(':');
+}
+
+function toggleTimer() {
+  const btn = document.getElementById('mainBtn');
+  if (!isRunning) {
+    const cat = document.getElementById('categorySelect').value;
+    if (!cat) { showToast('먼저 카테고리를 선택해주세요!'); return; }
+    isRunning = true;
+    timerSeconds = 0;
+    document.getElementById('timerDisplay').textContent = '00:00:00';
+    btn.className = 'btn-stop';
+    btn.textContent = '■ 정지';
+    document.getElementById('statusDot').style.display = 'inline-block';
+    document.getElementById('statusText').textContent = '기록 중';
+    document.getElementById('categorySelect').disabled = true;
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      document.getElementById('timerDisplay').textContent = formatTime(timerSeconds);
+    }, 1000);
+  } else {
+    clearInterval(timerInterval);
+    isRunning = false;
+    const cat = document.getElementById('categorySelect').value;
+    const mins = Math.round(timerSeconds / 60);
+    if (mins > 0) {
+      saveRecord(cat, mins);
+      showToast(`✓ ${cat}: ${mins}분 저장됨`);
+    }
+    btn.className = 'btn-start';
+    btn.textContent = '▶ 시작';
+    document.getElementById('statusDot').style.display = 'none';
+    document.getElementById('statusText').textContent = '대기 중';
+    document.getElementById('categorySelect').disabled = false;
+    document.getElementById('timerDisplay').textContent = '00:00:00';
+    timerSeconds = 0;
+    renderCalendar();
+    renderChart();
+  }
+}
+
+function saveRecord(category, minutes) {
+  const records = getRecords();
+  const today = new Date();
+  const dateKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  if (!records[dateKey]) records[dateKey] = {};
+  records[dateKey][category] = (records[dateKey][category] || 0) + minutes;
+  saveRecords(records);
+}
+
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderCalendar();
+  renderChart();
+}
+
+function renderCalendar() {
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('calendarTitle').textContent = `${currentYear}년 ${monthNames[currentMonth]}`;
+
+  const records = getRecords();
+  const today = new Date();
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+  const dayNames = ['일','월','화','수','목','금','토'];
+
+  let html = dayNames.map(d => `<div class="cal-header">${d}</div>`).join('');
+
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-cell empty"></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateKey = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = (today.getFullYear()===currentYear && today.getMonth()===currentMonth && today.getDate()===d);
+    const dayRecords = records[dateKey] || {};
+    const entries = Object.entries(dayRecords);
+    let entriesHTML = entries.map(([cat, mins]) => {
+      const shortCat = cat.length > 8 ? cat.substring(0,7)+'…' : cat;
+      return `<span class="cal-entry" title="${cat}: ${mins}분">${shortCat}: ${mins}분</span>`;
+    }).join('');
+    html += `<div class="cal-cell ${isToday?'today':''}">
+      <span class="cal-date">${d}</span>
+      ${entriesHTML}
+    </div>`;
+  }
+
+  const totalCells = firstDay + daysInMonth;
+  const remaining = (7 - (totalCells % 7)) % 7;
+  for (let i = 0; i < remaining; i++) html += `<div class="cal-cell empty"></div>`;
+
+  document.getElementById('calendarGrid').innerHTML = html;
+}
+
+function getMonthlyStats() {
+  const records = getRecords();
+  const cats = getCategories();
+  const stats = {};
+  cats.forEach(c => stats[c] = 0);
+
+  const prefix = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-`;
+  Object.entries(records).forEach(([date, dayData]) => {
+    if (date.startsWith(prefix)) {
+      Object.entries(dayData).forEach(([cat, mins]) => {
+        stats[cat] = (stats[cat] || 0) + mins;
+      });
+    }
+  });
+  return stats;
+}
+
+const CHART_COLORS = [
+  'rgba(59,130,246,0.85)', 'rgba(34,197,94,0.85)', 'rgba(249,115,22,0.85)',
+  'rgba(168,85,247,0.85)', 'rgba(20,184,166,0.85)', 'rgba(239,68,68,0.85)',
+  'rgba(234,179,8,0.85)', 'rgba(236,72,153,0.85)'
+];
+
+function renderChart() {
+  const stats = getMonthlyStats();
+  const labels = Object.keys(stats);
+  const data = Object.values(stats);
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('chartTitle').textContent = `${currentYear}년 ${monthNames[currentMonth]} 카테고리별 투자 시간 (분)`;
+
+  const ctx = document.getElementById('statsChart').getContext('2d');
+  if (currentChart) currentChart.destroy();
+
+  currentChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '투자 시간 (분)',
+        data: data,
+        backgroundColor: labels.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y}분 (${Math.round(ctx.parsed.y/60*10)/10}시간)`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: {
+            font: { family: 'Noto Sans KR', size: 11 },
+            callback: v => v + '분'
+          }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Noto Sans KR', size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+function showToast(msg) {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+initCategories();
+renderCalendar();
+renderChart();
+</script>
+</body>
+</html>
