@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>타임 트래커 대시보드</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #F5F0E8;
+    --bg2:       #EDE7D9;
+    --surface:   #FDFAF5;
+    --border:    #DDD5C4;
+    --border2:   #C8BBA8;
+    --brown-900: #2C2016;
+    --brown-700: #4A3728;
+    --brown-500: #7A5C44;
+    --brown-300: #B89880;
+    --brown-100: #EDE0D0;
+    --cream:     #F9F4EC;
+    --gold:      #A8885A;
+    --gold-light:#C9A97A;
+    --red-soft:  #C0614A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--brown-900);
+    min-height: 100vh;
+  }
+
+  /* 헤더 타이포 */
+  .serif { font-family: 'Playfair Display', serif; }
+
+  /* 타이머 */
+  .timer-display {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: var(--brown-700);
+    white-space: nowrap;
+    text-align: center;
+    width: 100%;
+    display: block;
+  }
+  .timer-running { color: var(--gold); }
+
+  /* 버튼 */
+  .btn-start {
+    background: var(--brown-700);
+    color: var(--cream);
+    border: none;
+    padding: 0.7rem 2.2rem;
+    border-radius: 9999px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+  }
+  .btn-start:hover { background: var(--brown-900); transform: translateY(-1px); }
+  .btn-stop {
+    background: var(--red-soft);
+    color: white;
+    border: none;
+    padding: 0.7rem 2.2rem;
+    border-radius: 9999px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+  }
+  .btn-stop:hover { background: #A8513C; transform: translateY(-1px); }
+
+  /* 카드 */
+  .card {
+    background: var(--surface);
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+  }
+
+  /* 달력 */
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    background: var(--border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+  .cal-header {
+    background: var(--brown-700);
+    color: var(--cream);
+    text-align: center;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  .cal-cell {
+    background: var(--surface);
+    min-height: 80px;
+    padding: 6px;
+    vertical-align: top;
+  }
+  .cal-cell.empty { background: var(--bg2); }
+  .cal-cell.today { background: #FAF4E8; }
+  .cal-date {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--brown-700);
+    margin-bottom: 4px;
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 22px;
+  }
+  .cal-cell.today .cal-date {
+    background: var(--gold);
+    color: white;
+  }
+  .cal-entry {
+    display: block;
+    font-size: 0.62rem;
+    color: var(--brown-700);
+    background: var(--brown-100);
+    border-left: 2px solid var(--gold);
+    padding: 1px 4px;
+    margin: 2px 0;
+    border-radius: 0 3px 3px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 네비 버튼 */
+  .nav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--brown-700);
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { background: var(--brown-100); border-color: var(--gold); color: var(--brown-900); }
+
+  /* 입력 */
+  select, input[type="text"] {
+    border: 1px solid var(--border2);
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.875rem;
+    font-size: 0.88rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--brown-900);
+    background: var(--cream);
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  select:focus, input[type="text"]:focus { border-color: var(--gold); }
+
+  .add-btn {
+    background: var(--brown-700);
+    color: var(--cream);
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.88rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .add-btn:hover { background: var(--brown-900); }
+
+  /* 태그 */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--brown-100);
+    border: 1px solid var(--border2);
+    border-radius: 9999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.78rem;
+    color: var(--brown-700);
+  }
+  .tag-remove {
+    cursor: pointer;
+    color: var(--brown-300);
+    font-size: 1rem;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .tag-remove:hover { color: var(--red-soft); }
+
+  /* 펄스 */
+  .pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: pulse 1.5s infinite;
+    display: inline-block;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.4; transform:scale(1.4); }
+  }
+
+  /* 구분선 */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1rem 0;
+  }
+
+  /* 모바일 */
+  @media (max-width: 640px) {
+    .cal-cell { min-height: 52px; padding: 4px; }
+    .cal-entry { font-size: 0.58rem; }
+    .cal-date { font-size: 0.68rem; width: 18px; height: 18px; line-height: 18px; }
+  }
+
+  /* 토스트 */
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem;
+    background: var(--brown-900); color: var(--cream);
+    padding: 0.7rem 1.2rem; border-radius: 0.75rem;
+    font-size: 0.85rem; z-index: 1000;
+    animation: slideUp 0.3s ease, fadeOut 0.3s ease 2.2s forwards;
+    border: 1px solid var(--brown-700);
+  }
+  @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeOut { to{opacity:0} }
+
+  /* 차트 레이블 */
+  .chart-label {
+    font-size: 0.72rem;
+    color: var(--brown-500);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+</style>
+</head>
+<body>
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+
+  <!-- 헤더 -->
+  <div class="mb-8">
+    <p class="chart-label mb-1">Daily Record</p>
+    <h1 class="serif text-3xl font-semibold" style="color:var(--brown-900)">타임 트래커</h1>
+    <hr class="divider" style="margin-top:0.75rem">
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+    <!-- 왼쪽 -->
+    <div class="lg:col-span-1 flex flex-col gap-4">
+
+      <!-- 스탑워치 -->
+      <div class="card text-center">
+        <p class="chart-label mb-3">Stopwatch</p>
+        <div class="flex items-center justify-center gap-2 mb-2">
+          <span id="statusDot" style="display:none" class="pulse-dot"></span>
+          <span id="statusText" style="font-size:0.75rem;color:var(--brown-300);letter-spacing:0.08em;">STANDBY</span>
+        </div>
+        <div style="overflow:hidden;padding:0 4px;margin-bottom:1.25rem;">
+          <span class="timer-display" id="timerDisplay">00:00:00</span>
+        </div>
+        <div class="mb-4">
+          <select id="categorySelect">
+            <option value="">카테고리 선택</option>
+          </select>
+        </div>
+        <button id="mainBtn" class="btn-start" onclick="toggleTimer()">▶ 시작</button>
+      </div>
+
+      <!-- 카테고리 관리 -->
+      <div class="card">
+        <p class="chart-label mb-3">Categories</p>
+        <div class="flex gap-2 mb-3">
+          <input type="text" id="newCategoryInput" placeholder="새 카테고리 이름" onkeydown="if(event.key==='Enter')addCategory()">
+          <button class="add-btn" onclick="addCategory()">추가</button>
+        </div>
+        <div id="categoryTags" class="flex flex-wrap gap-2"></div>
+      </div>
+
+    </div>
+
+    <!-- 달력 -->
+    <div class="lg:col-span-2">
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <button class="nav-btn" onclick="changeMonth(-1)">← 이전</button>
+          <h2 class="serif font-semibold text-lg" style="color:var(--brown-900)" id="calendarTitle"></h2>
+          <button class="nav-btn" onclick="changeMonth(1)">다음 →</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 통계 -->
+  <div class="card mt-5">
+    <p class="chart-label mb-1">Monthly Summary</p>
+    <h2 class="serif font-semibold mb-4" style="color:var(--brown-900);font-size:1.1rem" id="chartTitle"></h2>
+    <div style="position:relative;height:220px;">
+      <canvas id="statsChart"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let memStore = {};
+function lsSet(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+  memStore[key] = val;
+}
+function lsGet(key) {
+  try { const v = localStorage.getItem(key); if (v !== null) return JSON.parse(v); } catch(e) {}
+  return memStore[key] !== undefined ? memStore[key] : null;
+}
+
+const DEFAULT_CATEGORIES = ['인도네시아어 회화 공부', '콘텐츠 기획', '운동'];
+let timerInterval = null, timerSeconds = 0, isRunning = false, currentChart = null;
+let currentYear = new Date().getFullYear(), currentMonth = new Date().getMonth();
+
+function getCategories() { return lsGet('tt_categories') || [...DEFAULT_CATEGORIES]; }
+function saveCategories(c) { lsSet('tt_categories', c); }
+function getRecords() { return lsGet('tt_records') || {}; }
+function saveRecords(r) { lsSet('tt_records', r); }
+
+function initCategories() {
+  if (lsGet('tt_categories') === null) saveCategories([...DEFAULT_CATEGORIES]);
+  renderCategoryTags(); renderCategorySelect();
+}
+
+function renderCategoryTags() {
+  const cats = getCategories();
+  document.getElementById('categoryTags').innerHTML = cats.map((c, i) =>
+    `<span class="tag">${c}<span class="tag-remove" onclick="removeCategory(${i})">×</span></span>`
+  ).join('');
+}
+
+function renderCategorySelect() {
+  const cats = getCategories(), sel = document.getElementById('categorySelect'), cur = sel.value;
+  sel.innerHTML = '<option value="">카테고리 선택</option>' +
+    cats.map(c => `<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+}
+
+function addCategory() {
+  const inp = document.getElementById('newCategoryInput'), name = inp.value.trim();
+  if (!name) return;
+  const cats = getCategories();
+  if (cats.includes(name)) { showToast('이미 존재하는 카테고리예요.'); return; }
+  cats.push(name); saveCategories(cats); inp.value = '';
+  renderCategoryTags(); renderCategorySelect();
+}
+
+function removeCategory(i) {
+  const cats = getCategories(); cats.splice(i,1); saveCategories(cats);
+  renderCategoryTags(); renderCategorySelect();
+}
+
+function formatTime(s) {
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  return [h,m,sec].map(n=>String(n).padStart(2,'0')).join(':');
+}
+
+function toggleTimer() {
+  const btn = document.getElementById('mainBtn');
+  const display = document.getElementById('timerDisplay');
+  if (!isRunning) {
+    const cat = document.getElementById('categorySelect').value;
+    if (!cat) { showToast('먼저 카테고리를 선택해주세요!'); return; }
+    isRunning = true; timerSeconds = 0;
+    display.textContent = '00:00:00';
+    display.classList.add('timer-running');
+    btn.className = 'btn-stop'; btn.textContent = '■ 정지';
+    document.getElementById('statusDot').style.display = 'inline-block';
+    document.getElementById('statusText').textContent = 'RECORDING';
+    document.getElementById('categorySelect').disabled = true;
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      display.textContent = formatTime(timerSeconds);
+    }, 1000);
+  } else {
+    clearInterval(timerInterval); isRunning = false;
+    const cat = document.getElementById('categorySelect').value;
+    const mins = Math.max(1, Math.round(timerSeconds/60));
+    saveRecord(cat, mins);
+    showToast(`✓ ${cat}: ${mins}분 저장됨`);
+    btn.className = 'btn-start'; btn.textContent = '▶ 시작';
+    display.classList.remove('timer-running');
+    display.textContent = '00:00:00';
+    document.getElementById('statusDot').style.display = 'none';
+    document.getElementById('statusText').textContent = 'STANDBY';
+    document.getElementById('categorySelect').disabled = false;
+    timerSeconds = 0;
+    renderCalendar(); renderChart();
+  }
+}
+
+function saveRecord(category, minutes) {
+  const records = getRecords(), now = new Date();
+  const dateKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  if (!records[dateKey]) records[dateKey] = {};
+  records[dateKey][category] = (records[dateKey][category] || 0) + minutes;
+  saveRecords(records);
+}
+
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth > 11) { currentMonth=0; currentYear++; }
+  if (currentMonth < 0)  { currentMonth=11; currentYear--; }
+  renderCalendar(); renderChart();
+}
+
+function renderCalendar() {
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('calendarTitle').textContent = `${currentYear}년 ${monthNames[currentMonth]}`;
+  const records = getRecords(), today = new Date();
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+  const dayNames = ['일','월','화','수','목','금','토'];
+
+  let html = dayNames.map(d => `<div class="cal-header">${d}</div>`).join('');
+  for (let i=0;i<firstDay;i++) html += `<div class="cal-cell empty"></div>`;
+
+  for (let d=1;d<=daysInMonth;d++) {
+    const dateKey = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = (today.getFullYear()===currentYear && today.getMonth()===currentMonth && today.getDate()===d);
+    const dayRecords = records[dateKey] || {};
+    const entries = Object.entries(dayRecords).map(([cat, mins]) => {
+      const short = cat.length > 7 ? cat.substring(0,6)+'…' : cat;
+      return `<span class="cal-entry" title="${cat}: ${mins}분">${short}: ${mins}분</span>`;
+    }).join('');
+    html += `<div class="cal-cell${isToday?' today':''}"><span class="cal-date">${d}</span>${entries}</div>`;
+  }
+
+  const remaining = (7 - ((firstDay + daysInMonth) % 7)) % 7;
+  for (let i=0;i<remaining;i++) html += `<div class="cal-cell empty"></div>`;
+  document.getElementById('calendarGrid').innerHTML = html;
+}
+
+function getMonthlyStats() {
+  const records = getRecords(), cats = getCategories(), stats = {};
+  cats.forEach(c => stats[c] = 0);
+  const prefix = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-`;
+  Object.entries(records).forEach(([date, dayData]) => {
+    if (date.startsWith(prefix)) {
+      Object.entries(dayData).forEach(([cat, mins]) => {
+        stats[cat] = (stats[cat] || 0) + mins;
+      });
+    }
+  });
+  return stats;
+}
+
+const CHART_COLORS = [
+  'rgba(168,136,90,0.85)',
+  'rgba(122,92,68,0.85)',
+  'rgba(184,152,128,0.85)',
+  'rgba(192,97,74,0.85)',
+  'rgba(74,55,40,0.85)',
+  'rgba(201,169,122,0.85)',
+];
+
+function renderChart() {
+  const stats = getMonthlyStats();
+  const labels = Object.keys(stats), data = Object.values(stats);
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('chartTitle').textContent =
+    `${currentYear}년 ${monthNames[currentMonth]} — 카테고리별 투자 시간`;
+
+  const ctx = document.getElementById('statsChart').getContext('2d');
+  if (currentChart) currentChart.destroy();
+  currentChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '투자 시간 (분)',
+        data,
+        backgroundColor: labels.map((_,i) => CHART_COLORS[i % CHART_COLORS.length]),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2C2016',
+          titleColor: '#F9F4EC',
+          bodyColor: '#C9A97A',
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y}분 (${Math.round(ctx.parsed.y/60*10)/10}시간)`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(168,136,90,0.1)' },
+          ticks: {
+            stepSize: 1,
+            font: { family: 'Noto Sans KR', size: 11 },
+            color: '#7A5C44',
+            callback: v => Number.isInteger(v) ? v + '분' : ''
+          }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Noto Sans KR', size: 11 }, color: '#7A5C44' }
+        }
+      }
+    }
+  });
+}
+
+function showToast(msg) {
+  const old = document.querySelector('.toast'); if(old) old.remove();
+  const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(() => { if(t.parentNode) t.remove(); }, 2600);
+}
+
+initCategories(); renderCalendar(); renderChart();
+</script>
+</body>
+</html>
